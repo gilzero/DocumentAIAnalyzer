@@ -58,12 +58,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function animateProgress() {
         let progress = 0;
+        progressContainer.classList.add('active');
+
         const interval = setInterval(() => {
             if (progress < 90) {
-                progress += Math.random() * 10;
+                // Smooth, non-linear progress animation
+                const increment = Math.max(0.5, (90 - progress) / 10);
+                progress += increment;
                 updateProgress(Math.min(90, progress));
             }
-        }, 500);
+        }, 100);
+
         return interval;
     }
 
@@ -72,19 +77,30 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = `${percent}%`;
         progressBar.setAttribute('aria-valuenow', percent);
 
-        // Add smooth animation
-        progressBar.style.transition = 'width 0.5s ease-in-out';
+        // Update status message with animation
+        const statusText = progressContainer.querySelector('.progress-status');
+        let message = 'Preparing upload...';
+        let emphasize = false;
 
-        // Update status text based on progress
-        const statusText = progressContainer.querySelector('small');
-        if (percent < 30) {
-            statusText.textContent = 'Analyzing document structure...';
-        } else if (percent < 60) {
-            statusText.textContent = 'Processing content...';
-        } else if (percent < 90) {
-            statusText.textContent = 'Generating insights...';
-        } else {
-            statusText.textContent = 'Finalizing analysis...';
+        if (percent >= 90) {
+            message = 'Finalizing...';
+            emphasize = true;
+        } else if (percent >= 70) {
+            message = 'Generating insights...';
+            emphasize = true;
+        } else if (percent >= 40) {
+            message = 'Processing document...';
+        } else if (percent >= 20) {
+            message = 'Analyzing structure...';
+        }
+
+        if (statusText.textContent !== message) {
+            statusText.style.opacity = '0';
+            setTimeout(() => {
+                statusText.textContent = message;
+                statusText.style.opacity = '1';
+                statusText.classList.toggle('emphasize', emphasize);
+            }, 200);
         }
     }
 
@@ -144,15 +160,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData();
         formData.append('file', file);
 
-        // Show initial progress and preview
+        // Reset and show progress container
         progressContainer.style.display = 'block';
-        updateProgress(0);
-        loadingSpinner.style.display = 'block';
-        resultsContainer.innerHTML = '';
+        progressContainer.classList.remove('active');
+        progressBar.style.width = '0%';
 
-        // Add document preview
-        const previewContainer = createDocumentPreview(file);
-        resultsContainer.appendChild(previewContainer);
+        // Add status message element if it doesn't exist
+        if (!progressContainer.querySelector('.progress-status')) {
+            const statusEl = document.createElement('div');
+            statusEl.className = 'progress-status';
+            progressContainer.appendChild(statusEl);
+        }
+
+        // Delay to allow CSS transition to work
+        setTimeout(() => {
+            progressContainer.classList.add('active');
+            updateProgress(0);
+        }, 50);
+
+        loadingSpinner.style.display = 'block';
+        loadingSpinner.classList.add('active');
+        resultsContainer.innerHTML = '';
 
         // Start progress animation
         const progressInterval = animateProgress();
@@ -170,18 +198,31 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             clearInterval(progressInterval);
             updateProgress(100);
+
+            // Smooth transition to completion
             setTimeout(() => {
-                progressContainer.style.display = 'none';
-                loadingSpinner.style.display = 'none';
-                displayResults(data);
-                showToast('Document analyzed successfully!', 'success');
+                progressContainer.classList.remove('active');
+                loadingSpinner.classList.remove('active');
+
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    loadingSpinner.style.display = 'none';
+                    displayResults(data);
+                    showToast('Document analyzed successfully!', 'success');
+                }, 300);
             }, 500);
         })
         .catch(error => {
             clearInterval(progressInterval);
-            progressContainer.style.display = 'none';
-            loadingSpinner.style.display = 'none';
-            showToast(error.message || 'An error occurred while processing the document.', 'error');
+            progressContainer.classList.remove('active');
+            loadingSpinner.classList.remove('active');
+
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                loadingSpinner.style.display = 'none';
+                showToast(error.message || 'An error occurred while processing the document.', 'error');
+            }, 300);
+
             console.error('Error:', error);
         });
     }

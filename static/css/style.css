@@ -63,14 +63,104 @@ body {
 
 /* Progress Bar */
 .progress-container {
-    display: none;
-    margin: 1rem 0;
+    margin: 1.5rem 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease-in-out;
+}
+
+.progress-container.active {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 .progress {
     height: 0.5rem;
     border-radius: 1rem;
     background-color: var(--paper-gray);
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 1rem;
+    background: linear-gradient(90deg, var(--accent-blue) 0%, #00bcd4 100%);
+    transition: width 0.5s ease-in-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+.progress-status {
+    font-size: 0.875rem;
+    color: var(--text-dark);
+    margin-top: 0.5rem;
+    text-align: center;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.progress-status.emphasize {
+    opacity: 1;
+    font-weight: 500;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease-in-out;
+}
+
+.loading-spinner.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--paper-gray);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Document Preview */
