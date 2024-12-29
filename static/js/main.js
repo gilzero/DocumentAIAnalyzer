@@ -157,6 +157,21 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFileUpload(file) {
         if (!file) return;
 
+        // Validate file type
+        const fileType = file.type;
+        const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+        if (!validTypes.includes(fileType)) {
+            showToast('Please upload a PDF or Word document', 'error');
+            return;
+        }
+
+        // Validate file size (16MB max)
+        const maxSize = 16 * 1024 * 1024; // 16MB in bytes
+        if (file.size > maxSize) {
+            showToast(`File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds maximum allowed size (16MB)`, 'error');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('file', file);
 
@@ -189,11 +204,16 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+        .then(async response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error(`Server error: Unexpected response type (${response.status})`);
             }
-            return response.json();
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            }
+            return data;
         })
         .then(data => {
             clearInterval(progressInterval);
@@ -220,10 +240,22 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 progressContainer.style.display = 'none';
                 loadingSpinner.style.display = 'none';
-                showToast(error.message || 'An error occurred while processing the document.', 'error');
-            }, 300);
 
-            console.error('Error:', error);
+                // Enhanced error message handling
+                let errorMessage = 'An error occurred while processing the document.';
+                if (error.message.includes('Server error')) {
+                    errorMessage = 'The server encountered an error. Please try again later.';
+                } else if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'Network error. Please check your connection and try again.';
+                } else if (error.message.includes('HTTP error')) {
+                    errorMessage = 'Server communication error. Please try again.';
+                } else {
+                    errorMessage = error.message;
+                }
+
+                showToast(errorMessage, 'error');
+                console.error('Error details:', error);
+            }, 300);
         });
     }
 
