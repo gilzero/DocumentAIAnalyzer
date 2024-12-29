@@ -68,38 +68,30 @@ def upload_file():
             logger.warning("No selected file")
             return jsonify({'error': 'No selected file'}), 400
 
-        if '.' not in file.filename:
-            error_msg = "Invalid filename structure"
-            log_error("ValidationError", error_msg, metadata={'filename': file.filename})
-            return jsonify({
-                'error': error_msg,
-                'details': {'filename': file.filename}
-            }), 400
-
-        if not allowed_file(file.filename):
-            error_msg = "Invalid file type. Please upload a PDF or Word document"
-            log_error("ValidationError", error_msg, metadata={'filename': file.filename})
-            return jsonify({
-                'error': error_msg,
-                'details': {'filename': file.filename}
-            }), 400
-
         try:
             # Save and process file with Unicode filename support
             original_filename = file.filename
             normalized_filename = normalize_filename(original_filename)
-            file_extension = os.path.splitext(original_filename)[1].lower()
-            secure_base = secure_filename(os.path.splitext(normalized_filename)[0])
 
-            if not secure_base:
-                error_msg = "Invalid filename characters"
+            if not normalized_filename:
+                error_msg = "Unable to process filename - invalid characters or format"
                 log_error("ValidationError", error_msg, metadata={'original_filename': original_filename})
                 return jsonify({
                     'error': error_msg,
                     'details': {'original_filename': original_filename}
                 }), 400
 
-            filename = f"{secure_base}{file_extension}"
+            file_extension = os.path.splitext(original_filename)[1].lower()
+
+            if not allowed_file(original_filename):
+                error_msg = "Invalid file type. Please upload a PDF or Word document"
+                log_error("ValidationError", error_msg, metadata={'filename': original_filename})
+                return jsonify({
+                    'error': error_msg,
+                    'details': {'filename': original_filename}
+                }), 400
+
+            filename = f"{normalized_filename}"
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
             # Ensure upload directory exists

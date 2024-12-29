@@ -26,26 +26,33 @@ except Exception as e:
 
 def normalize_filename(filename):
     """
-    Normalize Unicode filename while preserving Chinese characters.
+    Normalize Unicode filename while preserving Chinese characters and other Unicode.
     """
     try:
         # Normalize Unicode characters (NFC form is preferred for most systems)
         normalized = unicodedata.normalize('NFC', filename)
 
-        # Replace problematic characters but keep Chinese characters
+        # Replace only specific dangerous characters while preserving Unicode
         safe_chars = []
         for char in normalized:
-            if unicodedata.category(char).startswith(('Lu', 'Ll', 'Nd', 'Han')):  # Letters, numbers, and Chinese characters
-                safe_chars.append(char)
-            elif char in ('-', '_', '.'):  # Allow certain punctuation
+            # Allow letters (including Unicode), numbers, Chinese characters
+            if (unicodedata.category(char).startswith(('Lu', 'Ll', 'Nd', 'Lo', 'Han')) or
+                char in ('-', '_', '.')):
                 safe_chars.append(char)
             else:
-                safe_chars.append('_')  # Replace other characters with underscore
+                safe_chars.append('_')  # Replace unsafe chars with underscore
 
-        return ''.join(safe_chars)
+        result = ''.join(safe_chars)
+
+        # Ensure the filename is not empty and has valid extension
+        if not result or '.' not in result:
+            logger.error(f"Invalid filename after normalization: {result}")
+            return None
+
+        return result
     except Exception as e:
-        logger.error(f"Error normalizing filename: {str(e)}")
-        return secure_filename(filename)  # Fallback to secure_filename
+        logger.error(f"Error normalizing filename '{filename}': {str(e)}")
+        return None
 
 def extract_doc_metadata(file_path):
     """Extract metadata from a Word document."""
