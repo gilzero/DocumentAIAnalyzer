@@ -9,6 +9,7 @@ dependencies = [
     "flask-sqlalchemy>=3.1.1",
     "markitdown>=0.0.1a3",
     "openai>=1.58.1",
+    "psutil>=6.1.1",
     "psycopg2-binary>=2.9.10",
     "pypdf2>=3.0.1",
     "python-docx>=1.1.2",

@@ -74,14 +74,24 @@ def extract_text_from_word(file_path):
         # Convert document using MarkItDown
         logger.debug("Starting MarkItDown conversion")
         try:
-            # Log memory usage before conversion
-            import psutil
-            process = psutil.Process(os.getpid())
-            logger.debug(f"Memory usage before conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
+            # Optional memory usage logging if psutil is available
+            try:
+                import psutil
+                process = psutil.Process(os.getpid())
+                logger.debug(f"Memory usage before conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
+            except ImportError:
+                logger.debug("psutil not available - skipping memory usage logging")
 
             result = md.convert(file_path)
 
-            logger.debug(f"Memory usage after conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
+            # Log memory usage after conversion if psutil is available
+            try:
+                import psutil
+                process = psutil.Process(os.getpid())
+                logger.debug(f"Memory usage after conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
+            except ImportError:
+                pass
+
             logger.debug("MarkItDown conversion completed")
 
         except Exception as e:
