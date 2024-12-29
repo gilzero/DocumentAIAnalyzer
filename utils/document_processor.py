@@ -48,6 +48,9 @@ def check_file_size(file_path, max_size_mb=16):
     try:
         file_size = os.path.getsize(file_path)
         max_size_bytes = max_size_mb * 1024 * 1024
+
+        logger.debug(f"Checking file size for {file_path}: {file_size / 1024 / 1024:.2f}MB")
+
         if file_size > max_size_bytes:
             raise ValueError(f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum allowed size ({max_size_mb}MB)")
         if file_size == 0:
@@ -67,9 +70,21 @@ def extract_text_from_word(file_path):
         if not os.access(file_path, os.R_OK):
             raise PermissionError(f"No read permission for file: {file_path}")
 
-        # Check file size
-        file_size = check_file_size(file_path)
+        # Check file size and log it
+        file_size = os.path.getsize(file_path)
         logger.debug(f"File size: {file_size / 1024:.1f}KB")
+
+        if file_size == 0:
+            raise ValueError("File is empty (0 bytes)")
+
+        # Verify file content
+        with open(file_path, 'rb') as f:
+            header = f.read(8)  # Read first 8 bytes to check file signature
+            if not header:
+                raise ValueError("File appears to be empty or corrupted")
+
+            # Log file signature for debugging
+            logger.debug(f"File signature (hex): {header.hex()}")
 
         # Convert document using MarkItDown
         logger.debug("Starting MarkItDown conversion")
@@ -82,6 +97,7 @@ def extract_text_from_word(file_path):
             except ImportError:
                 logger.debug("psutil not available - skipping memory usage logging")
 
+            # Use MarkItDown to convert the document
             result = md.convert(file_path)
 
             # Log memory usage after conversion if psutil is available
@@ -94,30 +110,30 @@ def extract_text_from_word(file_path):
 
             logger.debug("MarkItDown conversion completed")
 
+            # Verify extracted content
+            if not result:
+                raise ValueError("MarkItDown returned None result")
+
+            if not hasattr(result, 'text_content'):
+                raise ValueError("MarkItDown result missing text_content attribute")
+
+            if not result.text_content or not result.text_content.strip():
+                raise ValueError("Document conversion resulted in empty content")
+
+            # Log content length for debugging
+            content_length = len(result.text_content)
+            logger.debug(f"Extracted content length: {content_length} characters")
+
+            return result.text_content
+
         except Exception as e:
             logger.error("MarkItDown conversion failed", exc_info=True)
-            logger.error(f"Error details: {str(e)}")
             if "codec can't decode" in str(e):
                 raise ValueError("Document appears to be corrupted or using unsupported encoding")
             elif "memory" in str(e).lower():
                 raise ValueError("Document processing exceeded memory limits")
             else:
                 raise ValueError(f"Document conversion failed: {str(e)}")
-
-        if not result:
-            logger.error("MarkItDown returned None result")
-            raise ValueError("Document conversion failed - no result returned")
-
-        if not hasattr(result, 'text_content'):
-            logger.error("MarkItDown result missing text_content attribute")
-            raise ValueError("Document conversion failed - no text content attribute")
-
-        if not result.text_content or not result.text_content.strip():
-            logger.error("MarkItDown returned empty content")
-            raise ValueError("Document conversion resulted in empty content")
-
-        logger.info("Word document text extraction successful")
-        return result.text_content
 
     except Exception as e:
         logger.error(f"Failed to extract text from Word document: {str(e)}", exc_info=True)
@@ -177,9 +193,12 @@ def process_document(file_path):
             raise ValueError("Unable to determine file type - no extension found")
 
         # Verify file is not empty
-        if os.path.getsize(file_path) == 0:
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
             logger.error("Empty file detected")
             raise ValueError("The uploaded file is empty")
+
+        logger.debug(f"File size: {file_size / 1024:.1f}KB")
 
         if file_extension == '.pdf':
             return extract_text_from_pdf(file_path)
