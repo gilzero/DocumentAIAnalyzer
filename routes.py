@@ -32,6 +32,7 @@ def upload_file():
         # Save the uploaded file
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        logger.debug(f"Attempting to save file at: {file_path}")
         file.save(file_path)
         logger.info(f"File saved successfully at: {file_path}")
 
