@@ -1,0 +1,29 @@
+(psycopg2.errors.UndefinedColumn) column "processing_attempts" of relation "document" does not exist LINE 1: ...alysis_complete, summary, insights, doc_metadata, processing... ^ [SQL: INSERT INTO document (filename, original_filename, file_type, upload_date, analysis_complete, summary, insights, doc_metadata, processing_attempts, processing_method) VALUES (%(filename)s, %(original_filename)s, %(file_type)s, %(upload_date)s, %(analysis_complete)s, %(summary)s, %(insights)s::JSON, %(doc_metadata)s::JSON, %(processing_attempts)s, %(processing_method)s) RETURNING document.id] [parameters: {'filename': 'copy.docx', 'original_filename': 'copy.docx', 'file_type': 'docx', 'upload_date': datetime.datetime(2024, 12, 29, 9, 38, 11, 334870), 'analysis_complete': True, 'summary': 'The document revolves around a writer, Lao Ji, who returns to his hometown in Tiecheng after retiring from his academic career in Linnan. He becomes ... (233 characters truncated) ... the complexities of human relationships, ultimately emphasizing the transient nature of life and the enduring impact individuals have on each other.', 'insights': '"{\\"summary\\": \\"The document revolves around a writer, Lao Ji, who returns to his hometown in Tiecheng after retiring from his academic career in ... (1594 characters truncated) ... cument_type\\": \\"Narrative or Personal Essay\\", \\"structure\\": [\\"Introduction\\", \\"Body\\", \\"Conclusion\\"], \\"type_confidence\\": 0.95}"', 'doc_metadata': '"{\\"author\\": \\"Administrator\\", \\"created\\": \\"2024-12-28T17:17:00+00:00\\", \\"modified\\": \\"2024-12-28T17:17:00+00:00\\", \\"title\\": \\"\\", \\"subject\\": \\"\\", \\"keywords\\": \\"\\", \\"category\\": \\"\\", \\"paragraphs\\": 38, \\"sections\\": 1}"', 'processing_attempts': 1, 'processing_method': 'python-docx'}] (Background on this error at: https://sqlalche.me/e/20/f405)
+ Document Analyzer
+Document Analysis Tool
+Upload Your Document
+Drag and drop your PDF or Word document here, or click to browse
+
+ Full support
+ Full support
+PDF Preview
+Document Metadata
+Filename:
+Artificial_intelligence_to_advance_acute_and_intensive_care_medicine.pdf
+File Size:
+191.93 KB
+File Type:
+application/pdf
+Last Modified:
+12/24/2024, 8:55:54 PM
+copy.docx
+
+Document Metadata
+Filename:
+copy.docx
+File Size:
+29.07 KB
+File Type:
+application/vnd.openxmlformats-officedocument.wordprocessingml.document
+Last Modified:
+12/29/2024, 1:17:45 AM
