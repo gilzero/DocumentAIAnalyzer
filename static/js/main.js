@@ -80,14 +80,27 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showToast(message, type = 'info') {
-        Toastify({
-            text: message,
+        const icon = type === 'error' ? 'alert-circle' : 'check-circle';
+        const toast = Toastify({
+            text: `
+                <div class="d-flex align-items-center">
+                    <i data-feather="${icon}" class="me-2"></i>
+                    <span>${message}</span>
+                </div>
+            `,
             duration: 3000,
             gravity: "top",
             position: "right",
             className: type,
-            stopOnFocus: true
+            stopOnFocus: true,
+            escapeMarkup: false,
+            style: {
+                minWidth: '300px'
+            }
         }).showToast();
+
+        // Initialize Feather icons in the toast
+        feather.replace();
     }
 
     function animateProgress() {
@@ -188,6 +201,75 @@ document.addEventListener('DOMContentLoaded', function() {
         return previewContainer;
     }
 
+    function createMetadataPanel(file, metadata = {}) {
+        const panel = document.createElement('div');
+        panel.className = 'metadata-panel collapsed';
+
+        const formatFileSize = (bytes) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+
+        const formatDate = (date) => {
+            return new Date(date).toLocaleString();
+        };
+
+        panel.innerHTML = `
+            <div class="metadata-header">
+                <div class="d-flex align-items-center">
+                    <i data-feather="file-text" class="me-2"></i>
+                    <span>Document Metadata</span>
+                </div>
+                <i data-feather="chevron-down" class="toggle-icon"></i>
+            </div>
+            <div class="metadata-content hidden">
+                <div class="metadata-item">
+                    <span class="metadata-label">Filename:</span>
+                    <span class="metadata-value">${decodeURIComponent(file.name)}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">File Size:</span>
+                    <span class="metadata-value">${formatFileSize(file.size)}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">File Type:</span>
+                    <span class="metadata-value">${file.type || 'Unknown'}</span>
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Last Modified:</span>
+                    <span class="metadata-value">${formatDate(file.lastModified)}</span>
+                </div>
+                ${Object.entries(metadata).map(([key, value]) => `
+                    <div class="metadata-item">
+                        <span class="metadata-label">${key}:</span>
+                        <span class="metadata-value">${value}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Add toggle functionality
+        const header = panel.querySelector('.metadata-header');
+        const content = panel.querySelector('.metadata-content');
+        const toggleIcon = panel.querySelector('.toggle-icon');
+
+        header.addEventListener('click', () => {
+            panel.classList.toggle('collapsed');
+            panel.classList.toggle('expanded');
+            content.classList.toggle('hidden');
+            toggleIcon.style.transform = panel.classList.contains('expanded') ? 
+                'rotate(180deg)' : 'rotate(0deg)';
+        });
+
+        // Initialize Feather icons
+        feather.replace();
+
+        return panel;
+    }
+
     function handleFileUpload(file) {
         if (!file) return;
 
@@ -238,6 +320,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const preview = createDocumentPreview(file);
         document.getElementById('document-viewer').appendChild(preview);
 
+        // Create and append metadata panel
+        const metadataPanel = createMetadataPanel(file);
+        document.getElementById('document-viewer').appendChild(metadataPanel);
+
         // Start progress animation
         const progressInterval = animateProgress();
 
@@ -269,6 +355,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     progressContainer.style.display = 'none';
                     loadingSpinner.style.display = 'none';
                     displayResults(data);
+
+                    // Update metadata panel with additional info
+                    const metadataPanel = document.querySelector('.metadata-panel');
+                    if (metadataPanel && data.metadata) {
+                        metadataPanel.remove(); // Remove old panel
+                        const updatedPanel = createMetadataPanel(file, data.metadata);
+                        document.getElementById('document-viewer').appendChild(updatedPanel);
+                    }
+
                     showToast('Document analyzed successfully!', 'success');
                 }, 300);
             }, 500);
