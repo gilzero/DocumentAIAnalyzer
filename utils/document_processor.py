@@ -1,10 +1,11 @@
 import os
 import logging
-from docx import Document
 from PyPDF2 import PdfReader
 from werkzeug.utils import secure_filename
+from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
+md = MarkItDown()
 
 def allowed_file(filename):
     """Check if the file extension is allowed."""
@@ -29,19 +30,15 @@ def extract_text_from_pdf(file_path):
         logger.error(f"Failed to extract text from PDF: {str(e)}")
         raise
 
-def extract_text_from_docx(file_path):
-    """Extract text content from a DOCX file."""
-    logger.debug(f"Attempting to extract text from DOCX: {file_path}")
+def extract_text_from_word(file_path):
+    """Extract text content from a Word document using MarkItDown."""
+    logger.debug(f"Attempting to extract text from Word document: {file_path}")
     try:
-        doc = Document(file_path)
-        text = []
-        for para_num, paragraph in enumerate(doc.paragraphs):
-            logger.debug(f"Processing paragraph {para_num + 1}")
-            text.append(paragraph.text)
-        logger.debug("DOCX text extraction successful")
-        return '\n'.join(text)
+        result = md.convert(file_path)
+        logger.debug("Word document text extraction successful")
+        return result.text_content
     except Exception as e:
-        logger.error(f"Failed to extract text from DOCX: {str(e)}")
+        logger.error(f"Failed to extract text from Word document: {str(e)}")
         raise
 
 def process_document(file_path):
@@ -66,7 +63,7 @@ def process_document(file_path):
         if file_extension == '.pdf':
             return extract_text_from_pdf(file_path)
         elif file_extension in ['.doc', '.docx']:
-            return extract_text_from_docx(file_path)
+            return extract_text_from_word(file_path)
         else:
             logger.error(f"Unsupported file type: {file_extension}")
             raise ValueError(f"Unsupported file type: {file_extension}")
