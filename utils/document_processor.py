@@ -1,5 +1,6 @@
 import os
 import logging
+import unicodedata
 from PyPDF2 import PdfReader
 from werkzeug.utils import secure_filename
 from markitdown import MarkItDown
@@ -22,6 +23,29 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize MarkItDown: {str(e)}", exc_info=True)
     raise
+
+def normalize_filename(filename):
+    """
+    Normalize Unicode filename while preserving Chinese characters.
+    """
+    try:
+        # Normalize Unicode characters (NFC form is preferred for most systems)
+        normalized = unicodedata.normalize('NFC', filename)
+
+        # Replace problematic characters but keep Chinese characters
+        safe_chars = []
+        for char in normalized:
+            if unicodedata.category(char).startswith(('Lu', 'Ll', 'Nd', 'Han')):  # Letters, numbers, and Chinese characters
+                safe_chars.append(char)
+            elif char in ('-', '_', '.'):  # Allow certain punctuation
+                safe_chars.append(char)
+            else:
+                safe_chars.append('_')  # Replace other characters with underscore
+
+        return ''.join(safe_chars)
+    except Exception as e:
+        logger.error(f"Error normalizing filename: {str(e)}")
+        return secure_filename(filename)  # Fallback to secure_filename
 
 def extract_doc_metadata(file_path):
     """Extract metadata from a Word document."""

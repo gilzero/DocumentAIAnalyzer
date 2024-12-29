@@ -10,7 +10,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const progressContainer = document.querySelector('.progress-container');
     const progressBar = document.querySelector('.progress-bar');
 
-    // Drag and drop functionality
+    // File type icons mapping
+    const fileTypeIcons = {
+        'application/pdf': 'file-text',
+        'application/msword': 'file-text',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file-text'
+    };
+
+    // File compatibility status
+    const fileCompatibility = {
+        'application/pdf': { status: 'Full support', icon: 'check-circle', class: 'text-success' },
+        'application/msword': { status: 'Legacy format', icon: 'alert-triangle', class: 'text-warning' },
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { status: 'Full support', icon: 'check-circle', class: 'text-success' }
+    };
+
+    // Drag and drop functionality with visual feedback
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         uploadArea.addEventListener(eventName, preventDefaults, false);
     });
@@ -44,6 +58,26 @@ document.addEventListener('DOMContentLoaded', function() {
     fileInput.addEventListener('change', (e) => {
         handleFileUpload(e.target.files[0]);
     });
+
+    function showFileTypeInfo(fileType) {
+        const compatibility = fileCompatibility[fileType] || { 
+            status: 'Unknown format', 
+            icon: 'help-circle',
+            class: 'text-muted'
+        };
+
+        const infoHtml = `
+            <div class="file-compatibility-info ${compatibility.class} mb-3">
+                <i data-feather="${compatibility.icon}" class="me-2"></i>
+                <span>${compatibility.status}</span>
+            </div>
+        `;
+
+        const infoContainer = document.createElement('div');
+        infoContainer.innerHTML = infoHtml;
+        uploadArea.appendChild(infoContainer);
+        feather.replace();
+    }
 
     function showToast(message, type = 'info') {
         Toastify({
@@ -126,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             previewContainer.innerHTML = `
                                 <img src="${canvas.toDataURL()}" alt="PDF Preview">
                                 <div class="overlay">
-                                    <i data-feather="file-text"></i>
+                                    <i data-feather="${fileTypeIcons[file.type] || 'file'}" class="preview-icon"></i>
                                 </div>
                             `;
                             feather.replace();
@@ -134,11 +168,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 });
             } else {
-                // For Word documents, show a generic icon
+                // For Word documents, show a generic icon with filename
                 previewContainer.innerHTML = `
                     <div class="document-preview-placeholder">
-                        <i data-feather="file-text" style="width: 48px; height: 48px;"></i>
-                        <p class="mt-2">${file.name}</p>
+                        <i data-feather="${fileTypeIcons[file.type] || 'file'}" class="preview-icon"></i>
+                        <p class="mt-2">${decodeURIComponent(file.name)}</p>
                     </div>
                 `;
                 feather.replace();
@@ -164,6 +198,9 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Please upload a PDF or Word document', 'error');
             return;
         }
+
+        // Show file compatibility status
+        showFileTypeInfo(fileType);
 
         // Validate file size (16MB max)
         const maxSize = 16 * 1024 * 1024; // 16MB in bytes
@@ -196,6 +233,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingSpinner.style.display = 'block';
         loadingSpinner.classList.add('active');
         resultsContainer.innerHTML = '';
+
+        // Create and show document preview
+        const preview = createDocumentPreview(file);
+        document.getElementById('document-viewer').appendChild(preview);
 
         // Start progress animation
         const progressInterval = animateProgress();

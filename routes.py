@@ -6,7 +6,7 @@ from flask import render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from app import app, db
 from models import Document, ErrorLog
-from utils.document_processor import process_document, allowed_file, check_file_size
+from utils.document_processor import process_document, allowed_file, check_file_size, normalize_filename
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -52,7 +52,7 @@ def log_error(error_type, message, stack_trace=None, metadata=None):
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle document upload and processing."""
+    """Handle document upload and processing with improved error handling and Unicode support."""
     try:
         if 'file' not in request.files:
             logger.warning("No file part in request")
@@ -85,10 +85,11 @@ def upload_file():
             }), 400
 
         try:
-            # Save and process file
+            # Save and process file with Unicode filename support
             original_filename = file.filename
+            normalized_filename = normalize_filename(original_filename)
             file_extension = os.path.splitext(original_filename)[1].lower()
-            secure_base = secure_filename(os.path.splitext(original_filename)[0])
+            secure_base = secure_filename(os.path.splitext(normalized_filename)[0])
 
             if not secure_base:
                 error_msg = "Invalid filename characters"
