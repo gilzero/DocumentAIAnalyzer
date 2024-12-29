@@ -25,6 +25,10 @@ def upload_file():
         logger.warning("No selected file")
         return jsonify({'error': 'No selected file'}), 400
 
+    if not file.filename or '.' not in file.filename:
+        logger.error("Invalid filename structure")
+        return jsonify({'error': 'Invalid filename structure'}), 400
+
     if not allowed_file(file.filename):
         logger.warning(f"Invalid file type: {file.filename}")
         return jsonify({'error': 'Invalid file type. Please upload a PDF or Word document'}), 400
@@ -32,21 +36,19 @@ def upload_file():
     try:
         # Secure and validate filename
         original_filename = file.filename
-        base_filename = os.path.splitext(original_filename)[0]
         file_extension = os.path.splitext(original_filename)[1].lower()
 
-        if not base_filename or not file_extension:
-            logger.error("Invalid filename structure")
-            return jsonify({'error': 'Invalid filename structure'}), 400
-
-        # Create secure filename with extension
-        secure_base = secure_filename(base_filename)
+        # Create secure filename
+        secure_base = secure_filename(os.path.splitext(original_filename)[0])
         if not secure_base:
-            logger.error("Could not create secure filename")
-            return jsonify({'error': 'Invalid filename'}), 400
+            logger.error("Could not create secure filename from: " + original_filename)
+            return jsonify({'error': 'Invalid filename characters'}), 400
 
         filename = f"{secure_base}{file_extension}"
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # Ensure upload directory exists
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
         logger.debug(f"Attempting to save file at: {file_path}")
         file.save(file_path)
@@ -54,10 +56,12 @@ def upload_file():
 
         try:
             # Extract text from document
+            logger.debug(f"Starting document processing for {filename}")
             text_content = process_document(file_path)
             logger.info(f"Text extracted successfully from {filename}")
 
             # Analyze content with AI
+            logger.debug("Starting AI analysis")
             analysis_results = analyze_document(text_content)
             logger.info("AI analysis completed successfully")
 
@@ -90,7 +94,7 @@ def upload_file():
             })
 
         except Exception as e:
-            logger.error(f"Error processing document content: {str(e)}")
+            logger.error(f"Error processing document content: {str(e)}", exc_info=True)
             # Clean up the file if there was an error
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -101,11 +105,12 @@ def upload_file():
                 'details': {
                     'file_type': file_extension,
                     'filename': filename,
+                    'original_filename': original_filename
                 }
             }), 500
 
     except Exception as e:
-        logger.error(f"Error handling upload: {str(e)}")
+        logger.error(f"Error handling upload: {str(e)}", exc_info=True)
         return jsonify({
             'error': str(e),
             'message': 'Error uploading document',
