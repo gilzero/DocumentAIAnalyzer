@@ -2,6 +2,7 @@ import os
 import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from sqlalchemy.orm import DeclarativeBase
 
 # Set up logging
@@ -25,6 +26,7 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 
 # Initialize extensions
 db.init_app(app)
+migrate = Migrate(app, db)
 
 # Ensure upload directory exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

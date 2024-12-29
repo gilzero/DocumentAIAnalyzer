@@ -4,6 +4,8 @@ from PyPDF2 import PdfReader
 from werkzeug.utils import secure_filename
 from markitdown import MarkItDown
 from openai import OpenAI
+from docx import Document as DocxDocument
+import datetime
 
 # Set up logging with more detailed format
 logging.basicConfig(
@@ -21,48 +23,56 @@ except Exception as e:
     logger.error(f"Failed to initialize MarkItDown: {str(e)}", exc_info=True)
     raise
 
-def allowed_file(filename):
-    """Check if the file extension is allowed."""
-    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
+def extract_doc_metadata(file_path):
+    """Extract metadata from a Word document."""
     try:
-        if '.' not in filename:
-            logger.error("No file extension found")
-            return False
-
-        extension = filename.rsplit('.', 1)[1].lower()
-        if not extension in ALLOWED_EXTENSIONS:
-            logger.error(f"Extension {extension} not in allowed extensions")
-            return False
-
-        if not os.path.splitext(filename)[0]:
-            logger.error("No filename part found")
-            return False
-
-        return True
+        doc = DocxDocument(file_path)
+        core_properties = doc.core_properties
+        return {
+            "author": core_properties.author,
+            "created": core_properties.created.isoformat() if core_properties.created else None,
+            "modified": core_properties.modified.isoformat() if core_properties.modified else None,
+            "title": core_properties.title,
+            "subject": core_properties.subject,
+            "keywords": core_properties.keywords,
+            "category": core_properties.category,
+            "paragraphs": len(doc.paragraphs),
+            "sections": len(doc.sections)
+        }
     except Exception as e:
-        logger.error(f"Error checking file extension: {str(e)}")
-        return False
+        logger.warning(f"Could not extract metadata: {str(e)}")
+        return {}
 
-def check_file_size(file_path, max_size_mb=16):
-    """Check if file size is within acceptable limits."""
+def extract_text_using_python_docx(file_path):
+    """Fallback method to extract text using python-docx."""
     try:
-        file_size = os.path.getsize(file_path)
-        max_size_bytes = max_size_mb * 1024 * 1024
-
-        logger.debug(f"Checking file size for {file_path}: {file_size / 1024 / 1024:.2f}MB")
-
-        if file_size > max_size_bytes:
-            raise ValueError(f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum allowed size ({max_size_mb}MB)")
-        if file_size == 0:
-            raise ValueError("File is empty")
-        return file_size
-    except OSError as e:
-        raise ValueError(f"Error checking file size: {str(e)}")
+        logger.debug("Attempting text extraction using python-docx")
+        doc = DocxDocument(file_path)
+        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        if not text.strip():
+            raise ValueError("No text content found in document")
+        logger.info("Successfully extracted text using python-docx")
+        return text
+    except Exception as e:
+        logger.error(f"Failed to extract text using python-docx: {str(e)}")
+        raise
 
 def extract_text_from_word(file_path):
-    """Extract text content from a Word document using MarkItDown."""
+    """Extract text content from a Word document with fallback mechanisms."""
     logger.debug(f"Attempting to extract text from Word document: {file_path}")
+
+    errors = []
+    metadata = {}
+
     try:
+        # First try to extract metadata
+        try:
+            metadata = extract_doc_metadata(file_path)
+            logger.debug(f"Extracted metadata: {metadata}")
+        except Exception as e:
+            logger.warning(f"Metadata extraction failed: {str(e)}")
+            errors.append(("metadata", str(e)))
+
         # Verify file exists and is readable
         if not os.path.isfile(file_path):
             raise FileNotFoundError(f"Word document not found at path: {file_path}")
@@ -77,67 +87,35 @@ def extract_text_from_word(file_path):
         if file_size == 0:
             raise ValueError("File is empty (0 bytes)")
 
-        # Verify file content
-        with open(file_path, 'rb') as f:
-            header = f.read(8)  # Read first 8 bytes to check file signature
-            if not header:
-                raise ValueError("File appears to be empty or corrupted")
-
-            # Log file signature for debugging
-            logger.debug(f"File signature (hex): {header.hex()}")
-
-        # Convert document using MarkItDown
-        logger.debug("Starting MarkItDown conversion")
+        # First attempt: Try MarkItDown
         try:
-            # Optional memory usage logging if psutil is available
-            try:
-                import psutil
-                process = psutil.Process(os.getpid())
-                logger.debug(f"Memory usage before conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
-            except ImportError:
-                logger.debug("psutil not available - skipping memory usage logging")
-
-            # Use MarkItDown to convert the document
+            logger.debug("Attempting text extraction using MarkItDown")
             result = md.convert(file_path)
-
-            # Log memory usage after conversion if psutil is available
-            try:
-                import psutil
-                process = psutil.Process(os.getpid())
-                logger.debug(f"Memory usage after conversion: {process.memory_info().rss / 1024 / 1024:.1f}MB")
-            except ImportError:
-                pass
-
-            logger.debug("MarkItDown conversion completed")
-
-            # Verify extracted content
-            if not result:
-                raise ValueError("MarkItDown returned None result")
-
-            if not hasattr(result, 'text_content'):
-                raise ValueError("MarkItDown result missing text_content attribute")
-
-            if not result.text_content or not result.text_content.strip():
-                raise ValueError("Document conversion resulted in empty content")
-
-            # Log content length for debugging
-            content_length = len(result.text_content)
-            logger.debug(f"Extracted content length: {content_length} characters")
-
-            return result.text_content
-
-        except Exception as e:
-            logger.error("MarkItDown conversion failed", exc_info=True)
-            if "codec can't decode" in str(e):
-                raise ValueError("Document appears to be corrupted or using unsupported encoding")
-            elif "memory" in str(e).lower():
-                raise ValueError("Document processing exceeded memory limits")
+            if result and hasattr(result, 'text_content') and result.text_content.strip():
+                logger.info("Successfully extracted text using MarkItDown")
+                return result.text_content, metadata
             else:
-                raise ValueError(f"Document conversion failed: {str(e)}")
+                raise ValueError("MarkItDown returned empty content")
+        except Exception as e:
+            logger.warning(f"MarkItDown extraction failed: {str(e)}")
+            errors.append(("markitdown", str(e)))
+
+            # Second attempt: Try python-docx
+            try:
+                text = extract_text_using_python_docx(file_path)
+                if text.strip():
+                    logger.info("Successfully extracted text using fallback method (python-docx)")
+                    return text, metadata
+                else:
+                    raise ValueError("python-docx returned empty content")
+            except Exception as e:
+                logger.error(f"All extraction methods failed for {file_path}")
+                errors.append(("python-docx", str(e)))
+                raise ValueError(f"Failed to extract text using all available methods. Errors: {errors}")
 
     except Exception as e:
-        logger.error(f"Failed to extract text from Word document: {str(e)}", exc_info=True)
-        # Clean up any temporary files that might have been created
+        logger.error(f"Failed to process Word document: {str(e)}", exc_info=True)
+        # Clean up any temporary files
         try:
             temp_dir = os.path.join(os.path.dirname(file_path), '.markitdown_temp')
             if os.path.exists(temp_dir):
@@ -177,8 +155,46 @@ def extract_text_from_pdf(file_path):
         logger.error(f"Failed to extract text from PDF: {str(e)}", exc_info=True)
         raise
 
+def check_file_size(file_path, max_size_mb=16):
+    """Check if file size is within acceptable limits."""
+    try:
+        file_size = os.path.getsize(file_path)
+        max_size_bytes = max_size_mb * 1024 * 1024
+
+        logger.debug(f"Checking file size for {file_path}: {file_size / 1024 / 1024:.2f}MB")
+
+        if file_size > max_size_bytes:
+            raise ValueError(f"File size ({file_size / 1024 / 1024:.1f}MB) exceeds maximum allowed size ({max_size_mb}MB)")
+        if file_size == 0:
+            raise ValueError("File is empty")
+        return file_size
+    except OSError as e:
+        raise ValueError(f"Error checking file size: {str(e)}")
+
+def allowed_file(filename):
+    """Check if the file extension is allowed."""
+    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
+    try:
+        if '.' not in filename:
+            logger.error("No file extension found")
+            return False
+
+        extension = filename.rsplit('.', 1)[1].lower()
+        if not extension in ALLOWED_EXTENSIONS:
+            logger.error(f"Extension {extension} not in allowed extensions")
+            return False
+
+        if not os.path.splitext(filename)[0]:
+            logger.error("No filename part found")
+            return False
+
+        return True
+    except Exception as e:
+        logger.error(f"Error checking file extension: {str(e)}")
+        return False
+
 def process_document(file_path):
-    """Process a document file and extract its text content."""
+    """Process a document file and extract its text content with metadata."""
     logger.debug(f"Starting document processing for: {file_path}")
     try:
         if not os.path.exists(file_path):
@@ -201,7 +217,7 @@ def process_document(file_path):
         logger.debug(f"File size: {file_size / 1024:.1f}KB")
 
         if file_extension == '.pdf':
-            return extract_text_from_pdf(file_path)
+            return extract_text_from_pdf(file_path), {}
         elif file_extension in ['.doc', '.docx']:
             return extract_text_from_word(file_path)
         else:

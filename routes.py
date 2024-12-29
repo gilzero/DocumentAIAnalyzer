@@ -54,7 +54,6 @@ def log_error(error_type, message, stack_trace=None, metadata=None):
 def upload_file():
     """Handle document upload and processing."""
     try:
-        # Validate request has file
         if 'file' not in request.files:
             logger.warning("No file part in request")
             return jsonify({
@@ -86,12 +85,11 @@ def upload_file():
             }), 400
 
         try:
-            # Secure and validate filename
+            # Save and process file
             original_filename = file.filename
             file_extension = os.path.splitext(original_filename)[1].lower()
-
-            # Create secure filename
             secure_base = secure_filename(os.path.splitext(original_filename)[0])
+
             if not secure_base:
                 error_msg = "Invalid filename characters"
                 log_error("ValidationError", error_msg, metadata={'original_filename': original_filename})
@@ -110,23 +108,10 @@ def upload_file():
             file.save(file_path)
             logger.info(f"File saved successfully at: {file_path}")
 
-            # Verify file size
             try:
-                check_file_size(file_path)
-            except ValueError as e:
-                error_msg = str(e)
-                log_error("FileSizeError", error_msg, metadata={'filename': filename})
-                os.remove(file_path)
-                return jsonify({
-                    'error': error_msg,
-                    'details': {'filename': filename}
-                }), 400
-
-            try:
-                # Extract text from document
-                logger.debug(f"Starting document processing for {filename}")
-                text_content = process_document(file_path)
-                logger.info(f"Text extracted successfully from {filename}")
+                # Process document and extract text/metadata
+                text_content, metadata = process_document(file_path)
+                logger.info(f"Document processed successfully with metadata: {metadata}")
 
                 # Analyze content with AI
                 from utils.ai_analyzer import analyze_document
@@ -134,18 +119,20 @@ def upload_file():
                 analysis_results = analyze_document(text_content)
                 logger.info("AI analysis completed successfully")
 
-                # Save to database
+                # Save to database with metadata
                 document = Document(
                     filename=filename,
                     original_filename=original_filename,
-                    file_type=file_extension[1:],  # Remove the leading dot
+                    file_type=file_extension[1:],
                     analysis_complete=True,
                     summary=analysis_results.get('summary', ''),
-                    insights=analysis_results
+                    insights=analysis_results,
+                    doc_metadata=metadata,
+                    processing_method='markitdown' if 'markdown_content' in metadata else 'python-docx'
                 )
                 db.session.add(document)
                 db.session.commit()
-                logger.info(f"Document {filename} saved to database")
+                logger.info(f"Document {filename} saved to database with metadata")
 
                 # Clean up uploaded file
                 os.remove(file_path)
@@ -159,7 +146,8 @@ def upload_file():
                     'summary': analysis_results.get('summary', ''),
                     'insights': analysis_results.get('key_points', []),
                     'topics': analysis_results.get('main_topics', []),
-                    'entities': analysis_results.get('important_entities', [])
+                    'entities': analysis_results.get('important_entities', []),
+                    'metadata': metadata
                 })
 
             except Exception as e:
@@ -175,10 +163,8 @@ def upload_file():
                         'error_type': type(e).__name__
                     }
                 )
-                # Clean up the file if there was an error
                 if os.path.exists(file_path):
                     os.remove(file_path)
-                    logger.debug(f"Cleaned up file {file_path} after error")
                 return jsonify({
                     'error': str(e),
                     'message': 'Failed to process document content',
