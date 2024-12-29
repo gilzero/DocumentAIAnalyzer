@@ -42,7 +42,7 @@ def log_error(error_type, message, stack_trace=None, metadata=None):
             error_type=error_type,
             message=str(message),
             stack_trace=stack_trace,
-            error_metadata=metadata or {}
+            error_metadata=json.dumps(metadata) if metadata else None
         )
         db.session.add(error_log)
         db.session.commit()
@@ -120,15 +120,22 @@ def upload_file():
                 analysis_results = analyze_document(text_content)
                 logger.info("AI analysis completed successfully")
 
+                # Convert Python objects to JSON strings before database insertion
+                insights_json = json.dumps(analysis_results)
+                metadata_json = json.dumps(metadata)
+                summary = analysis_results.get('summary', '')
+                if isinstance(summary, dict):
+                    summary = json.dumps(summary)
+
                 # Save to database with metadata
                 document = Document(
                     filename=filename,
                     original_filename=original_filename,
                     file_type=file_extension[1:],
                     analysis_complete=True,
-                    summary=analysis_results.get('summary', ''),
-                    insights=analysis_results,
-                    doc_metadata=metadata,
+                    summary=summary,
+                    insights=insights_json,
+                    doc_metadata=metadata_json,
                     processing_method='markitdown' if 'markdown_content' in metadata else 'python-docx'
                 )
                 db.session.add(document)
@@ -144,7 +151,7 @@ def upload_file():
                     'document_type': analysis_results.get('document_type', 'Unknown'),
                     'structure': analysis_results.get('structure', []),
                     'type_confidence': analysis_results.get('type_confidence', 0),
-                    'summary': analysis_results.get('summary', ''),
+                    'summary': summary,
                     'insights': analysis_results.get('key_points', []),
                     'topics': analysis_results.get('main_topics', []),
                     'entities': analysis_results.get('important_entities', []),
