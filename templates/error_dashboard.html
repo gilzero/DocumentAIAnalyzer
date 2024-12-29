@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="paper-container">
+        <h2 class="mb-4">Error Monitoring Dashboard</h2>
+        
+        <!-- Error Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Errors</h5>
+                        <p class="card-text" id="total-errors">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Errors</h5>
+                        <p class="card-text" id="recent-errors">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Error Rate</h5>
+                        <p class="card-text" id="error-rate">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error List -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Error Logs</h5>
+            </div>
+            <div class="card-body">
+                <div id="error-list" class="accordion">
+                    <!-- Error items will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+
+    function createErrorCard(error) {
+        const cardHtml = `
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#error-${error.id}">
+                        <span class="me-3 badge bg-danger">${error.error_type}</span>
+                        ${error.message}
+                    </button>
+                </h2>
+                <div id="error-${error.id}" class="accordion-collapse collapse">
+                    <div class="accordion-body">
+                        <div class="mb-3">
+                            <strong>Timestamp:</strong> ${formatDate(error.timestamp)}
+                        </div>
+                        ${error.stack_trace ? `
+                            <div class="mb-3">
+                                <strong>Stack Trace:</strong>
+                                <pre class="bg-light p-3 mt-2"><code>${error.stack_trace}</code></pre>
+                            </div>
+                        ` : ''}
+                        ${error.metadata ? `
+                            <div>
+                                <strong>Metadata:</strong>
+                                <pre class="bg-light p-3 mt-2"><code>${JSON.stringify(error.metadata, null, 2)}</code></pre>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        return cardHtml;
+    }
+
+    function updateErrorStats(errors) {
+        document.getElementById('total-errors').textContent = errors.length;
+        document.getElementById('recent-errors').textContent = 
+            errors.filter(e => new Date(e.timestamp) > new Date(Date.now() - 3600000)).length;
+        
+        const errorRate = (errors.length / 24).toFixed(2); // Simple errors per hour calculation
+        document.getElementById('error-rate').textContent = `${errorRate}/hour`;
+    }
+
+    function loadErrors() {
+        fetch('/api/errors')
+            .then(response => response.json())
+            .then(errors => {
+                const errorList = document.getElementById('error-list');
+                errorList.innerHTML = errors.map(error => createErrorCard(error)).join('');
+                updateErrorStats(errors);
+            })
+            .catch(error => {
+                console.error('Error fetching error logs:', error);
+                showToast('Failed to load error logs', 'error');
+            });
+    }
+
+    // Initial load
+    loadErrors();
+
+    // Refresh every 30 seconds
+    setInterval(loadErrors, 30000);
+});
+</script>
+{% endblock %}

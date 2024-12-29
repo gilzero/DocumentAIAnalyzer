@@ -1,17 +1,54 @@
 import os
 import logging
+import json
+from datetime import datetime
 from flask import render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from app import app, db
-from models import Document
+from models import Document, ErrorLog
 from utils.document_processor import process_document, allowed_file, check_file_size
 
+# Set up logging with more detailed format
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/error-dashboard')
+def error_dashboard():
+    return render_template('error_dashboard.html')
+
+@app.route('/api/errors')
+def get_errors():
+    errors = ErrorLog.query.order_by(ErrorLog.timestamp.desc()).limit(100).all()
+    return jsonify([{
+        'id': error.id,
+        'error_type': error.error_type,
+        'message': error.message,
+        'stack_trace': error.stack_trace,
+        'timestamp': error.timestamp.isoformat(),
+        'metadata': error.error_metadata
+    } for error in errors])
+
+def log_error(error_type, message, stack_trace=None, metadata=None):
+    """Log error to database and console."""
+    try:
+        error_log = ErrorLog(
+            error_type=error_type,
+            message=str(message),
+            stack_trace=stack_trace,
+            error_metadata=metadata or {}
+        )
+        db.session.add(error_log)
+        db.session.commit()
+        logger.error(f"Error logged: {error_type} - {message}")
+    except Exception as e:
+        logger.error(f"Failed to log error to database: {str(e)}")
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -33,16 +70,18 @@ def upload_file():
             return jsonify({'error': 'No selected file'}), 400
 
         if '.' not in file.filename:
-            logger.error("Invalid filename structure")
+            error_msg = "Invalid filename structure"
+            log_error("ValidationError", error_msg, metadata={'filename': file.filename})
             return jsonify({
-                'error': 'Invalid filename structure',
+                'error': error_msg,
                 'details': {'filename': file.filename}
             }), 400
 
         if not allowed_file(file.filename):
-            logger.warning(f"Invalid file type: {file.filename}")
+            error_msg = "Invalid file type. Please upload a PDF or Word document"
+            log_error("ValidationError", error_msg, metadata={'filename': file.filename})
             return jsonify({
-                'error': 'Invalid file type. Please upload a PDF or Word document',
+                'error': error_msg,
                 'details': {'filename': file.filename}
             }), 400
 
@@ -54,9 +93,10 @@ def upload_file():
             # Create secure filename
             secure_base = secure_filename(os.path.splitext(original_filename)[0])
             if not secure_base:
-                logger.error("Could not create secure filename from: " + original_filename)
+                error_msg = "Invalid filename characters"
+                log_error("ValidationError", error_msg, metadata={'original_filename': original_filename})
                 return jsonify({
-                    'error': 'Invalid filename characters',
+                    'error': error_msg,
                     'details': {'original_filename': original_filename}
                 }), 400
 
@@ -74,9 +114,11 @@ def upload_file():
             try:
                 check_file_size(file_path)
             except ValueError as e:
+                error_msg = str(e)
+                log_error("FileSizeError", error_msg, metadata={'filename': filename})
                 os.remove(file_path)
                 return jsonify({
-                    'error': str(e),
+                    'error': error_msg,
                     'details': {'filename': filename}
                 }), 400
 
@@ -121,7 +163,18 @@ def upload_file():
                 })
 
             except Exception as e:
-                logger.error(f"Error processing document content: {str(e)}", exc_info=True)
+                error_msg = f"Error processing document content: {str(e)}"
+                log_error(
+                    "ProcessingError",
+                    error_msg,
+                    stack_trace=str(e.__traceback__),
+                    metadata={
+                        'file_type': file_extension,
+                        'filename': filename,
+                        'original_filename': original_filename,
+                        'error_type': type(e).__name__
+                    }
+                )
                 # Clean up the file if there was an error
                 if os.path.exists(file_path):
                     os.remove(file_path)
@@ -138,7 +191,13 @@ def upload_file():
                 }), 500
 
         except Exception as e:
-            logger.error(f"Error handling upload: {str(e)}", exc_info=True)
+            error_msg = f"Error handling upload: {str(e)}"
+            log_error(
+                "UploadError",
+                error_msg,
+                stack_trace=str(e.__traceback__),
+                metadata={'original_filename': file.filename}
+            )
             return jsonify({
                 'error': str(e),
                 'message': 'Error uploading document',
@@ -149,7 +208,13 @@ def upload_file():
             }), 500
 
     except Exception as e:
-        logger.error(f"Unexpected error in upload route: {str(e)}", exc_info=True)
+        error_msg = f"Unexpected error in upload route: {str(e)}"
+        log_error(
+            "UnexpectedError",
+            error_msg,
+            stack_trace=str(e.__traceback__),
+            metadata={'error_type': type(e).__name__}
+        )
         return jsonify({
             'error': 'Internal server error',
             'message': str(e),
