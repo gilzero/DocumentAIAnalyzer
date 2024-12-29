@@ -79,6 +79,9 @@ def upload_file():
 
             return jsonify({
                 'success': True,
+                'document_type': analysis_results.get('document_type', 'Unknown'),
+                'structure': analysis_results.get('structure', []),
+                'type_confidence': analysis_results.get('type_confidence', 0),
                 'summary': analysis_results.get('summary', ''),
                 'insights': analysis_results.get('key_points', []),
                 'topics': analysis_results.get('main_topics', []),

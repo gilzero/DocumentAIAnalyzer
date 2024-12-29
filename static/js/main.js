@@ -56,10 +56,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }).showToast();
     }
 
+    function animateProgress() {
+        let progress = 0;
+        const interval = setInterval(() => {
+            if (progress < 90) {
+                progress += Math.random() * 10;
+                updateProgress(Math.min(90, progress));
+            }
+        }, 500);
+        return interval;
+    }
+
     function updateProgress(percent) {
         progressContainer.style.display = 'block';
         progressBar.style.width = `${percent}%`;
         progressBar.setAttribute('aria-valuenow', percent);
+
+        // Add smooth animation
+        progressBar.style.transition = 'width 0.5s ease-in-out';
+
+        // Update status text based on progress
+        const statusText = progressContainer.querySelector('small');
+        if (percent < 30) {
+            statusText.textContent = 'Analyzing document structure...';
+        } else if (percent < 60) {
+            statusText.textContent = 'Processing content...';
+        } else if (percent < 90) {
+            statusText.textContent = 'Generating insights...';
+        } else {
+            statusText.textContent = 'Finalizing analysis...';
+        }
     }
 
     function createDocumentPreview(file) {
@@ -128,14 +154,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const previewContainer = createDocumentPreview(file);
         resultsContainer.appendChild(previewContainer);
 
-        // Simulate progress (since we can't get real upload progress)
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += 5;
-            if (progress <= 90) {
-                updateProgress(progress);
-            }
-        }, 200);
+        // Start progress animation
+        const progressInterval = animateProgress();
 
         fetch('/upload', {
             method: 'POST',
@@ -172,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <h3>Document Analysis</h3>
                 <div class="card mb-3">
                     <div class="card-body">
+                        <h5>Document Type</h5>
+                        <p>${data.document_type || 'Not detected'}</p>
                         <h5>Summary</h5>
                         <p>${data.summary}</p>
                     </div>
@@ -187,13 +209,5 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         resultsContainer.innerHTML = resultsHtml;
-    }
-
-    function showError(message) {
-        resultsContainer.innerHTML = `
-            <div class="alert alert-danger" role="alert">
-                ${message}
-            </div>
-        `;
     }
 });
