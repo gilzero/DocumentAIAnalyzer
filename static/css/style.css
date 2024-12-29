@@ -429,3 +429,99 @@ body {
 .metadata-value {
     color: var(--accent-blue);
 }
+
+/* File Preview Styles */
+.filename-preview {
+    background: var(--paper-white);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.filename-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filename-display {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filename-text {
+    margin-left: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.char-count-tooltip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.char-count-tooltip span {
+    padding: 0.25rem 0.5rem;
+    background: var(--paper-gray);
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* File Compatibility Info */
+.file-compatibility-info {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: var(--paper-white);
+    animation: slide-in-up 0.3s ease-out;
+}
+
+.encoding-info {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+/* Enhanced Toast Styles */
+.toastify {
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.toastify.error {
+    background: #fff;
+    color: #dc3545;
+    border-left: 4px solid #dc3545;
+}
+
+.toastify.success {
+    background: #fff;
+    color: #28a745;
+    border-left: 4px solid #28a745;
+}
+
+.toastify .text-muted {
+    color: #6c757d !important;
+}
+
+/* Animation Keyframes */
+@keyframes slide-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -13,15 +13,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // File type icons mapping
     const fileTypeIcons = {
         'application/pdf': 'file-text',
-        'application/msword': 'file-text',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file-text'
+        'application/msword': 'file-word',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file-word'
     };
 
-    // File compatibility status
+    // Enhanced file compatibility status with encoding support
     const fileCompatibility = {
-        'application/pdf': { status: 'Full support', icon: 'check-circle', class: 'text-success' },
-        'application/msword': { status: 'Legacy format', icon: 'alert-triangle', class: 'text-warning' },
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { status: 'Full support', icon: 'check-circle', class: 'text-success' }
+        'application/pdf': { 
+            status: 'Full support', 
+            icon: 'check-circle', 
+            class: 'text-success',
+            encoding: 'UTF-8/Binary'
+        },
+        'application/msword': { 
+            status: 'Legacy format', 
+            icon: 'alert-triangle', 
+            class: 'text-warning',
+            encoding: 'Binary'
+        },
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { 
+            status: 'Full support', 
+            icon: 'check-circle', 
+            class: 'text-success',
+            encoding: 'UTF-8/Binary'
+        }
     };
 
     // Drag and drop functionality with visual feedback
@@ -59,17 +74,67 @@ document.addEventListener('DOMContentLoaded', function() {
         handleFileUpload(e.target.files[0]);
     });
 
-    function showFileTypeInfo(fileType) {
+    function createFilenamePreview(filename) {
+        const container = document.createElement('div');
+        container.className = 'filename-preview mt-2';
+
+        // Count characters by type
+        const stats = {
+            total: filename.length,
+            ascii: 0,
+            chinese: 0,
+            other: 0
+        };
+
+        [...filename].forEach(char => {
+            if (/[\u4e00-\u9fa5]/.test(char)) {
+                stats.chinese++;
+            } else if (/[\x00-\x7F]/.test(char)) {
+                stats.ascii++;
+            } else {
+                stats.other++;
+            }
+        });
+
+        container.innerHTML = `
+            <div class="filename-stats">
+                <div class="filename-display" title="${filename}">
+                    <i data-feather="file" class="me-2"></i>
+                    <span class="filename-text">${filename}</span>
+                </div>
+                <div class="char-count-tooltip">
+                    <span class="total">Total: ${stats.total} characters</span>
+                    ${stats.chinese ? `<span class="chinese">Chinese: ${stats.chinese}</span>` : ''}
+                    ${stats.ascii ? `<span class="ascii">ASCII: ${stats.ascii}</span>` : ''}
+                    ${stats.other ? `<span class="other">Other: ${stats.other}</span>` : ''}
+                </div>
+            </div>
+        `;
+
+        feather.replace();
+        return container;
+    }
+
+    function showEncodingInfo(fileType) {
         const compatibility = fileCompatibility[fileType] || { 
             status: 'Unknown format', 
             icon: 'help-circle',
-            class: 'text-muted'
+            class: 'text-muted',
+            encoding: 'Unknown'
         };
 
         const infoHtml = `
             <div class="file-compatibility-info ${compatibility.class} mb-3">
-                <i data-feather="${compatibility.icon}" class="me-2"></i>
-                <span>${compatibility.status}</span>
+                <div class="d-flex align-items-center">
+                    <i data-feather="${compatibility.icon}" class="me-2"></i>
+                    <span>${compatibility.status}</span>
+                </div>
+                <div class="encoding-info mt-1">
+                    <small class="text-muted">
+                        <i data-feather="code" class="me-1"></i>
+                        Encoding: ${compatibility.encoding}
+                    </small>
+                </div>
             </div>
         `;
 
@@ -79,16 +144,28 @@ document.addEventListener('DOMContentLoaded', function() {
         feather.replace();
     }
 
-    function showToast(message, type = 'info') {
+
+    function showFileTypeInfo(fileType) {
+        //This function is not used anymore, it's replaced by showEncodingInfo
+    }
+
+    function showToast({ message, type = 'info', details = null }) {
         const icon = type === 'error' ? 'alert-circle' : 'check-circle';
         const toast = Toastify({
             text: `
-                <div class="d-flex align-items-center">
-                    <i data-feather="${icon}" class="me-2"></i>
-                    <span>${message}</span>
+                <div class="d-flex flex-column">
+                    <div class="d-flex align-items-center">
+                        <i data-feather="${icon}" class="me-2"></i>
+                        <span>${message}</span>
+                    </div>
+                    ${details ? `
+                        <small class="text-muted mt-1">
+                            ${details}
+                        </small>
+                    ` : ''}
                 </div>
             `,
-            duration: 3000,
+            duration: 4000,
             gravity: "top",
             position: "right",
             className: type,
@@ -99,7 +176,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }).showToast();
 
-        // Initialize Feather icons in the toast
         feather.replace();
     }
 
@@ -273,21 +349,46 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleFileUpload(file) {
         if (!file) return;
 
+        // Clear previous previews
+        const prevPreviews = uploadArea.querySelectorAll('.filename-preview, .file-compatibility-info');
+        prevPreviews.forEach(el => el.remove());
+
+        // Add filename preview with stats
+        const filenamePreview = createFilenamePreview(file.name);
+        uploadArea.appendChild(filenamePreview);
+
+        // Show file type and encoding compatibility
+        showEncodingInfo(file.type);
+
         // Validate file type
-        const fileType = file.type;
         const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (!validTypes.includes(fileType)) {
-            showToast('Please upload a PDF or Word document', 'error');
+        if (!validTypes.includes(file.type)) {
+            showToast({
+                message: 'Please upload a PDF or Word document',
+                type: 'error',
+                details: 'Supported formats: PDF (.pdf), Word (.doc, .docx)'
+            });
             return;
         }
 
-        // Show file compatibility status
-        showFileTypeInfo(fileType);
+        // Validate filename characters
+        const invalidChars = /[<>:"/\\|?*\x00-\x1F]/g;
+        if (invalidChars.test(file.name)) {
+            showToast({
+                message: 'Invalid characters in filename',
+                type: 'error',
+                details: 'Filename contains invalid characters. Please rename the file and try again.'
+            });
+            return;
+        }
 
-        // Validate file size (16MB max)
         const maxSize = 16 * 1024 * 1024; // 16MB in bytes
         if (file.size > maxSize) {
-            showToast(`File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds maximum allowed size (16MB)`, 'error');
+            showToast({
+                message: `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds maximum allowed size (16MB)`,
+                type: 'error',
+                details: 'Please select a smaller file.'
+            });
             return;
         }
 
@@ -364,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById('document-viewer').appendChild(updatedPanel);
                     }
 
-                    showToast('Document analyzed successfully!', 'success');
+                    showToast({message: 'Document analyzed successfully!', type: 'success'});
                 }, 300);
             }, 500);
         })
@@ -389,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     errorMessage = error.message;
                 }
 
-                showToast(errorMessage, 'error');
+                showToast({message: errorMessage, type: 'error'});
                 console.error('Error details:', error);
             }, 300);
         });
