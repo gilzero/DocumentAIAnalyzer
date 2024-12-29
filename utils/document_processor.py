@@ -3,13 +3,16 @@ import logging
 from PyPDF2 import PdfReader
 from werkzeug.utils import secure_filename
 from markitdown import MarkItDown
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Initialize MarkItDown with error handling
+# Initialize OpenAI client for MarkItDown
 try:
-    md = MarkItDown()
+    openai_client = OpenAI()
+    md = MarkItDown(llm_client=openai_client, llm_model="gpt-4o")
+    logger.debug("Successfully initialized MarkItDown with OpenAI integration")
 except Exception as e:
     logger.error(f"Failed to initialize MarkItDown: {str(e)}")
     raise
