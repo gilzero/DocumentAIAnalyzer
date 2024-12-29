@@ -29,8 +29,12 @@ def upload_file():
         return jsonify({'error': 'Invalid file type. Please upload a PDF or Word document'}), 400
 
     try:
-        # Save the uploaded file
-        filename = secure_filename(file.filename)
+        # Save the uploaded file with extension
+        original_filename = file.filename
+        file_extension = os.path.splitext(original_filename)[1].lower()
+        base_filename = secure_filename(os.path.splitext(original_filename)[0])
+        filename = f"{base_filename}{file_extension}"
+
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         logger.debug(f"Attempting to save file at: {file_path}")
         file.save(file_path)
@@ -48,8 +52,8 @@ def upload_file():
             # Save to database
             document = Document(
                 filename=filename,
-                original_filename=file.filename,
-                file_type=filename.rsplit('.', 1)[1].lower(),
+                original_filename=original_filename,
+                file_type=file_extension[1:],  # Remove the leading dot
                 analysis_complete=True,
                 summary=analysis_results.get('summary', ''),
                 insights=analysis_results
