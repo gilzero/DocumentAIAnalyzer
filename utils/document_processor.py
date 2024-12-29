@@ -5,7 +5,14 @@ from werkzeug.utils import secure_filename
 from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
-md = MarkItDown()
+logger.setLevel(logging.DEBUG)
+
+# Initialize MarkItDown with error handling
+try:
+    md = MarkItDown()
+except Exception as e:
+    logger.error(f"Failed to initialize MarkItDown: {str(e)}")
+    raise
 
 def allowed_file(filename):
     """Check if the file extension is allowed."""
@@ -34,7 +41,20 @@ def extract_text_from_word(file_path):
     """Extract text content from a Word document using MarkItDown."""
     logger.debug(f"Attempting to extract text from Word document: {file_path}")
     try:
+        # Verify file exists and is readable
+        if not os.path.isfile(file_path):
+            raise FileNotFoundError(f"Word document not found at path: {file_path}")
+
+        if not os.access(file_path, os.R_OK):
+            raise PermissionError(f"No read permission for file: {file_path}")
+
+        # Convert document using MarkItDown
+        logger.debug("Starting MarkItDown conversion")
         result = md.convert(file_path)
+
+        if not result or not result.text_content:
+            raise ValueError("MarkItDown conversion resulted in empty content")
+
         logger.debug("Word document text extraction successful")
         return result.text_content
     except Exception as e:

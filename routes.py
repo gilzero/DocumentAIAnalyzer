@@ -8,6 +8,7 @@ from utils.document_processor import process_document, allowed_file
 from utils.ai_analyzer import analyze_document
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 @app.route('/')
 def index():
@@ -96,12 +97,19 @@ def upload_file():
                 logger.debug(f"Cleaned up file {file_path} after error")
             return jsonify({
                 'error': str(e),
-                'message': 'Failed to process document content'
+                'message': 'Failed to process document content',
+                'details': {
+                    'file_type': file_extension,
+                    'filename': filename,
+                }
             }), 500
 
     except Exception as e:
         logger.error(f"Error handling upload: {str(e)}")
         return jsonify({
             'error': str(e),
-            'message': 'Error uploading document'
+            'message': 'Error uploading document',
+            'details': {
+                'original_filename': getattr(file, 'filename', None),
+            }
         }), 500
