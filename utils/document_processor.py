@@ -9,7 +9,9 @@ logger = logging.getLogger(__name__)
 def allowed_file(filename):
     """Check if the file extension is allowed."""
     ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS and \
+           os.path.splitext(filename)[0]  # Ensure there's a filename part
 
 def extract_text_from_pdf(file_path):
     """Extract text content from a PDF file."""
@@ -56,6 +58,10 @@ def process_document(file_path):
         if not file_extension:
             logger.error("No file extension detected")
             raise ValueError("Unable to determine file type - no extension found")
+
+        if not os.path.getsize(file_path):
+            logger.error("Empty file detected")
+            raise ValueError("The uploaded file is empty")
 
         if file_extension == '.pdf':
             return extract_text_from_pdf(file_path)

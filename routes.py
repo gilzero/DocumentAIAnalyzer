@@ -29,13 +29,24 @@ def upload_file():
         return jsonify({'error': 'Invalid file type. Please upload a PDF or Word document'}), 400
 
     try:
-        # Save the uploaded file with extension
+        # Secure and validate filename
         original_filename = file.filename
+        base_filename = os.path.splitext(original_filename)[0]
         file_extension = os.path.splitext(original_filename)[1].lower()
-        base_filename = secure_filename(os.path.splitext(original_filename)[0])
-        filename = f"{base_filename}{file_extension}"
 
+        if not base_filename or not file_extension:
+            logger.error("Invalid filename structure")
+            return jsonify({'error': 'Invalid filename structure'}), 400
+
+        # Create secure filename with extension
+        secure_base = secure_filename(base_filename)
+        if not secure_base:
+            logger.error("Could not create secure filename")
+            return jsonify({'error': 'Invalid filename'}), 400
+
+        filename = f"{secure_base}{file_extension}"
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
         logger.debug(f"Attempting to save file at: {file_path}")
         file.save(file_path)
         logger.info(f"File saved successfully at: {file_path}")
